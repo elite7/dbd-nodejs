@@ -13,6 +13,11 @@ var	cookie 	= fs.readFileSync("./cookie.txt","utf-8");
 // 	IntervalID;				//计时器的ID
 
 var InteralObj = {};	//计时器对象
+
+//项目列表，用于监听
+var productList = {
+
+};
 //每个拍卖的计时器
 function paimaiInterval(paimaiId,intervalId){
 	InteralObj.paimaiId = intervalId;
@@ -23,11 +28,11 @@ function stopPaimai(paimaiId){
 	console.log("已停止拍卖"+paimaiId);
 }
 //拍卖开始函数
-function beginPaimai(paimaiId,maxprice,lastTime){
+function beginPaimai(paimaiId,maxprice,lastTime,isJianTing){
 	var	IntervalTime = 10000,	//初始时间间隔
 		IntervalID;				//计时器的ID
 	
-	function ready(paimaiInfo,maxprice,lastTime,paimaiId){
+	function ready(paimaiInfo,maxprice,lastTime,paimaiId,isJianTing){
 		paimaiInfo = paimaiInfo[0];
 		//如果为拍卖请求，则hrefList为maxPrice，callback为lastTime
 		function setIntervalTime(time){
@@ -40,7 +45,7 @@ function beginPaimai(paimaiId,maxprice,lastTime){
 				},IntervalTime);
 			}
 			paimaiInterval(paimaiId,IntervalID);
-			// console.log(InteralObj);
+			// productList[paimaiInfo.productId] = true;
 		}
 		//倒计时时间
 		var remainTime = paimaiInfo.remainTime;
@@ -125,7 +130,6 @@ function sendPrice(paimaiId,price){
 //请求信息函数
 function getAuctionInfo(paimaiIds,callback,self1,self2){
 	//请求url拼接
-	console.time('请求延迟');
 	var dateNow = Date.now();
 	var postData = querystring.stringify({
 		'paimaiIds':paimaiIds,
@@ -143,9 +147,9 @@ function getAuctionInfo(paimaiIds,callback,self1,self2){
 			//当chunk数据量过大时，采用如下方法拼接chunk，方法见https://cnodejs.org/topic/4faf65852e8fb5bc65113403
 			chunks.push(chunk);  
   			size += chunk.length;
+	    	console.log('请求延迟：' + (Date.now() - dateNow) + 'ms');
 		});
 	    res.on('end', function() {
-	    	console.timeEnd('请求延迟');
 	    	paimaiInfo = new Buffer(size);
   			for (var i = 0, pos = 0, l = chunks.length; i < l; i++) {
   				var chunkTemp = chunks[i];
@@ -199,6 +203,7 @@ function getNameByHTML(html){
 	console.log(productStatus + productName);
 }
 
+
 //根据productId获取同类商品
 function getSameSkuById(productId){
 	var url = "http://dbditem.jd.com/json/paimaiProduct/queryPaimaiBigField?id="+productId;
@@ -245,7 +250,6 @@ function getAvgBypaimaiId(paimaiId){
 function getPidByNo(paimaiId,callback){
 	getAuctionInfo(paimaiId,function(paimaiInfo,callback){
 		paimaiInfo = paimaiInfo[0];
-		console.log("此物品项目ID："+paimaiInfo.productId);
 		callback(paimaiInfo.productId);
 	},callback);
 }
@@ -300,43 +304,100 @@ function loginByCookie(cookie){
 	req.end();
 };
 
-loginByCookie(cookie);
-var readline = require('readline');
-var rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+//根据获取到的HMTL得到名称
+function getIdByHTML(html){
+	var $ 				= cheerio.load(html),
+		idListForHTML 			= $('.auctionList ul li'),
+		idList = []
+	idListForHTML.each((index,value)=>{
+		idList.push(+$(value).attr('id').replace(/(li-)/g,""));
+	})
+	return idList;
+}
 
-rl.setPrompt('1.根据拍卖ID获取历史价格\n2.输入ID开始拍卖\n3.停止拍卖\n每次使用前请将最新的cookie填入，否则可能出现拍卖失败的情况\n');
-rl.prompt();
+jianTing();
+function jianTing(){
+	//请求信息
+	var postData = querystring.stringify({
+		sortField:'2'
+	});
+	//Request Headers
+	var options = {
+		hostname:'dbd.jd.com',
+		port:80,
+		path:'/auctionList.html?' + postData,
+		method:'GET',
+	}
+	//发送请求模块
+	var req = http.request(options,function(res){
+		var chunks = [];
+		var size = 0;
+		var sameSku = "";
+	    res.on('data',function(chunk){
+			//将解压后的buffer对象转换为字符串
+			//当chunk数据量过大时，采用如下方法拼接chunk，方法见https://cnodejs.org/topic/4faf65852e8fb5bc65113403
+			chunks.push(chunk);  
+  			size += chunk.length;
+		});
+	    res.on('end', function() {
+	    	sameSku = new Buffer(size);
+  			for (var i = 0, pos = 0, l = chunks.length; i < l; i++) {
+  				var chunkTemp = chunks[i];
+  				chunkTemp.copy(sameSku,pos);
+  				pos += chunkTemp.length;
+  			}
+			sameSku = sameSku.toString();
+			getIdByHTML(sameSku).forEach((value)=>{
+				getPidByNo(value,(res)=>{
+					// if(res)
+				});
+			});
+	    });
+	});
+	req.write(postData);
+	req.end();
+}
 
-rl.on('line', function(line){
-    switch(line.trim()) {
-        case '1':
-	        rl.question("输入拍卖ID > ",function(paimaiId){
-			    // 不加close，则不会结束
-            	getAvgBypaimaiId(paimaiId);
-            	getHTMLById(paimaiId,function(html){
-					getNameByHTML(html);
-					getPidByNo(paimaiId,function(productId){
-						getSameSkuById(productId);
-					});
-				});
-			    // rl.close();
-			});
-            break;
-        case '2':
-            rl.question("输入拍卖ID > ",function(paimaiId){
-			    rl.question("最高不超过多少元 > ",function(maxprice){
-            		rl.question("请输入最后出价时间（ms） > ",function(lastTime){
-	            		beginPaimai(paimaiId,maxprice,lastTime);
-					});
-				});
-			});
-            break;
-        case '3':
-        	rl.question("输入需要停止的拍卖ID > ",function(paimaiId){
-				 stopPaimai(paimaiId);
-			});
-    }
-});
+
+
+
+// loginByCookie(cookie);
+// var readline = require('readline');
+// var rl = readline.createInterface({
+//     input: process.stdin,
+//     output: process.stdout
+// });
+
+// rl.setPrompt('1.根据拍卖ID获取历史价格\n2.输入ID开始拍卖\n3.停止拍卖\n每次使用前请将最新的cookie填入，否则可能出现拍卖失败的情况\n');
+// rl.prompt();
+
+// rl.on('line', function(line){
+//     switch(line.trim()) {
+//         case '1':
+// 	        rl.question("输入拍卖ID > ",function(paimaiId){
+// 			    // 不加close，则不会结束
+//             	getAvgBypaimaiId(paimaiId);
+//             	getHTMLById(paimaiId,function(html){
+// 					getNameByHTML(html);
+// 					getPidByNo(paimaiId,function(productId){
+// 						getSameSkuById(productId);
+// 					});
+// 				});
+// 			    // rl.close();
+// 			});
+//             break;
+//         case '2':
+//             rl.question("输入拍卖ID > ",function(paimaiId){
+// 			    rl.question("最高不超过多少元 > ",function(maxprice){
+//             		rl.question("请输入最后出价时间（ms） > ",function(lastTime){
+// 	            		beginPaimai(paimaiId,maxprice,lastTime);
+// 					});
+// 				});
+// 			});
+//             break;
+//         case '3':
+//         	rl.question("输入需要停止的拍卖ID > ",function(paimaiId){
+// 				 stopPaimai(paimaiId);
+// 			});
+//     }
+// });
