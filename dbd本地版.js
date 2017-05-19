@@ -147,9 +147,9 @@ function getAuctionInfo(paimaiIds,callback,self1,self2){
 			//当chunk数据量过大时，采用如下方法拼接chunk，方法见https://cnodejs.org/topic/4faf65852e8fb5bc65113403
 			chunks.push(chunk);  
   			size += chunk.length;
-	    	console.log('请求延迟：' + (Date.now() - dateNow) + 'ms');
 		});
 	    res.on('end', function() {
+	    	console.log('请求延迟：' + (Date.now() - dateNow) + 'ms');
 	    	paimaiInfo = new Buffer(size);
   			for (var i = 0, pos = 0, l = chunks.length; i < l; i++) {
   				var chunkTemp = chunks[i];
@@ -315,7 +315,7 @@ function getIdByHTML(html){
 	return idList;
 }
 
-jianTing();
+// jianTing();
 function jianTing(){
 	//请求信息
 	var postData = querystring.stringify({
@@ -358,46 +358,43 @@ function jianTing(){
 	req.end();
 }
 
+loginByCookie(cookie);
+var readline = require('readline');
+var rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
 
+rl.setPrompt('1.根据拍卖ID获取历史价格\n2.输入ID开始拍卖\n3.停止拍卖\n每次使用前请将最新的cookie填入，否则可能出现拍卖失败的情况\n');
+rl.prompt();
 
-
-// loginByCookie(cookie);
-// var readline = require('readline');
-// var rl = readline.createInterface({
-//     input: process.stdin,
-//     output: process.stdout
-// });
-
-// rl.setPrompt('1.根据拍卖ID获取历史价格\n2.输入ID开始拍卖\n3.停止拍卖\n每次使用前请将最新的cookie填入，否则可能出现拍卖失败的情况\n');
-// rl.prompt();
-
-// rl.on('line', function(line){
-//     switch(line.trim()) {
-//         case '1':
-// 	        rl.question("输入拍卖ID > ",function(paimaiId){
-// 			    // 不加close，则不会结束
-//             	getAvgBypaimaiId(paimaiId);
-//             	getHTMLById(paimaiId,function(html){
-// 					getNameByHTML(html);
-// 					getPidByNo(paimaiId,function(productId){
-// 						getSameSkuById(productId);
-// 					});
-// 				});
-// 			    // rl.close();
-// 			});
-//             break;
-//         case '2':
-//             rl.question("输入拍卖ID > ",function(paimaiId){
-// 			    rl.question("最高不超过多少元 > ",function(maxprice){
-//             		rl.question("请输入最后出价时间（ms） > ",function(lastTime){
-// 	            		beginPaimai(paimaiId,maxprice,lastTime);
-// 					});
-// 				});
-// 			});
-//             break;
-//         case '3':
-//         	rl.question("输入需要停止的拍卖ID > ",function(paimaiId){
-// 				 stopPaimai(paimaiId);
-// 			});
-//     }
-// });
+rl.on('line', function(line){
+    switch(line.trim()) {
+        case '1':
+	        rl.question("输入拍卖ID > ",function(paimaiId){
+			    // 不加close，则不会结束
+            	getAvgBypaimaiId(paimaiId);
+            	getHTMLById(paimaiId,function(html){
+					getNameByHTML(html);
+					getPidByNo(paimaiId,function(productId){
+						getSameSkuById(productId);
+					});
+				});
+			    // rl.close();
+			});
+            break;
+        case '2':
+            rl.question("输入拍卖ID > ",function(paimaiId){
+			    rl.question("最高不超过多少元 > ",function(maxprice){
+            		rl.question("请输入最后出价时间（ms） > ",function(lastTime){
+	            		beginPaimai(paimaiId,maxprice,lastTime);
+					});
+				});
+			});
+            break;
+        case '3':
+        	rl.question("输入需要停止的拍卖ID > ",function(paimaiId){
+				 stopPaimai(paimaiId);
+			});
+    }
+});
